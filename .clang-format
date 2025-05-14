@@ -1,0 +1,18 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+
+Language: Cpp
+
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortBlocksOnASingleLine: Never
+ColumnLimit: 120
+BreakBeforeBinaryOperators: None
+SpaceBeforeParens: Never
+SpaceAfterCStyleCast: true
+
+AllowAllParametersOfDeclarationOnNextLine: true
+
+BreakBeforeBraces: Attach
+
+SeparateDefinitionBlocks: Leave

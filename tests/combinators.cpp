@@ -1,0 +1,211 @@
+#include <catch2/catch_all.hpp>
+#include <string>
+#include <variant>
+
+#include "catch2/catch_test_macros.hpp"
+#include "kipaco.h"
+
+using namespace kipaco;
+
+TEST_CASE("Predicate Combinator") {
+    auto is_digit = [](const char& c) { return std::isdigit(c); };
+    auto is_vowel = [](const char& c) { return std::string("aeiouAEIOU").find(c) != std::string::npos; };
+
+    SECTION("Successful predicate") {
+        auto parser = char_parser::any_char().pred(is_digit);
+        auto result = parser.parse("5apples");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == '5');
+        REQUIRE(result->remainder == "apples");
+    }
+
+    SECTION("Failed predicate preserves original input") {
+        auto parser = char_parser::any_char().pred(is_vowel);
+        auto result = parser.parse("zebra");
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "zebra"); // Original input
+    }
+
+    SECTION("Propagates underlying parser failure") {
+        auto parser = char_parser::any_char().pred(is_digit);
+        auto result = parser.parse(""); // Empty input
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error().empty());
+    }
+}
+
+TEST_CASE("Bind Combinator") {
+    SECTION("Successful chained parsing") {
+        // Parse first char, then require next char to match
+        auto parser = char_parser::any_char().bind([](char c) { return char_parser::chosen_char(c); });
+
+        auto result = parser.parse("aabc");
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == 'a');
+        REQUIRE(result->remainder == "bc");
+    }
+
+    SECTION("Propagates first parser failure") {
+        auto parser = char_parser::chosen_char('@').bind([](char) { return char_parser::any_char(); }); // Never reached
+
+        auto result = parser.parse("missing");
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "missing");
+    }
+
+    SECTION("Complex bind chain") {
+        // Parse "a" followed by "b" followed by "c"
+        auto parser =
+            char_parser::chosen_char('a').bind([](auto) { return char_parser::chosen_char('b'); }).bind([](auto) {
+                return char_parser::chosen_char('c');
+            });
+
+        auto success = parser.parse("abc");
+        REQUIRE(success.has_value());
+        REQUIRE(success->remainder.empty());
+
+        auto failure = parser.parse("abd");
+        REQUIRE(failure.has_error());
+        REQUIRE(failure.error() == "d"); // Failure at final parser
+    }
+
+    SECTION("Operator") {
+        // Parse "a" followed by "b" followed by "c"
+        auto parser = char_parser::chosen_char('a') * char_parser::chosen_char('b') * char_parser::chosen_char('c');
+
+        auto success = parser.parse("abc");
+        REQUIRE(success.has_value());
+        REQUIRE(success->remainder.empty());
+
+        auto failure = parser.parse("abd");
+        REQUIRE(failure.has_error());
+        REQUIRE(failure.error() == "d"); // Failure at final parser
+    }
+}
+
+TEST_CASE("Map Combinator", "[combinators, map]") {
+    auto pred = [](char c) { return std::stoi(std::string(1, c)); };
+
+    auto parser = char_parser::any_char().map(pred);
+
+    SECTION("Should map a digit to int") {
+        auto input = "12";
+
+        auto res = parser.parse(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->remainder == "2");
+        REQUIRE(res->match == 1);
+    }
+
+    SECTION("Should fail when not digit") {
+        auto input = "A2";
+
+        REQUIRE_THROWS(parser.parse(input));
+    }
+}
+
+TEST_CASE("Negate Combinator", "[combinators, negate]") {
+    auto parser = char_parser::chosen_char('T').negate();
+
+    SECTION("Should fail when the parser succeds") {
+        auto input = "Teste";
+
+        auto res = parser.parse(input);
+
+        REQUIRE(res.has_error());
+        REQUIRE(res.error() == "Teste");
+    }
+
+    SECTION("Should Succed when parser fails") {
+        auto input = "teste";
+
+        auto res = parser.parse(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->remainder == "teste");
+        REQUIRE(res->match == std::monostate());
+    }
+}
+
+TEST_CASE("pair combinator", "[parser][combinator][pair]") {
+    SECTION("literal + literal succeeds") {
+        auto parser = literal("foo") + literal("bar");
+
+        auto result = parser.parse("foobar");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match.first == std::monostate());  // monostate
+        REQUIRE(result->match.second == std::monostate()); // monostate
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("literal + any_char succeeds") {
+        auto parser = literal("a") + char_parser::any_char();
+
+        auto result = parser.parse("ab");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match.first == std::monostate()); // monostate
+        REQUIRE(result->match.second == 'b');
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("any_char + literal succeeds") {
+        auto parser = char_parser::any_char() + literal("b");
+
+        auto result = parser.parse("ab");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match.first == 'a');
+        REQUIRE(result->match.second == std::monostate()); // monostate
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Fails if first parser fails") {
+        auto parser = literal("foo") + literal("bar");
+
+        auto result = parser.parse("bazbar");
+
+        REQUIRE(result.has_error());
+    }
+
+    SECTION("Fails if second parser fails") {
+        auto parser = literal("foo") + literal("bar");
+
+        auto result = parser.parse("foobaz");
+
+        REQUIRE(result.has_error());
+    }
+
+    SECTION("Operator+ with monostate and char") {
+        auto parser = "a" + char_parser::any_char(); // "a" becomes literal("a")
+
+        auto result = parser.parse("ab");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match.first == std::monostate()); // monostate
+        REQUIRE(result->match.second == 'b');
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Nested pair") {
+        auto parser = char_parser::any_char() + (literal("x") + char_parser::any_char());
+
+        auto result = parser.parse("axy");
+
+        REQUIRE(result.has_value());
+
+        auto outer = result->match;
+        auto c1 = outer.first;
+        auto inner = outer.second;
+
+        REQUIRE(c1 == 'a');
+        REQUIRE(inner.first == std::monostate()); // monostate
+        REQUIRE(inner.second == 'y');
+        REQUIRE(result->remainder == "");
+    }
+}

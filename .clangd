@@ -1,0 +1,12 @@
+Format:
+  Style: file
+
+Diagnostics:
+  ClangTidy:
+    Add: modernize*
+    Add: bugprone*
+    Add: performance*
+    Add: readability*
+    Add: llvm*
+    Add: cppcoreguidelines*
+    Remove: modernize-use-trailing-return-type
