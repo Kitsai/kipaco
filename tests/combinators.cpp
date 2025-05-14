@@ -2,6 +2,7 @@
 #include <string>
 #include <variant>
 
+#include "basic_parsers/char.h"
 #include "catch2/catch_test_macros.hpp"
 #include "kipaco.h"
 
@@ -278,5 +279,65 @@ TEST_CASE("Left and Right Combinators") {
 
         REQUIRE(result.has_error());
         REQUIRE(result.error() == "f00bar");
+    }
+}
+
+TEST_CASE("many operation", "[multiple][many]") {
+    auto parser = char_parser::chosen_char('a').many();
+
+    SECTION("should collect all matches.") {
+        auto input = "aaabc";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->match.size() == 3);
+        REQUIRE(res->match == std::vector<char>{'a', 'a', 'a'});
+        REQUIRE(res->remainder == "bc");
+    }
+
+    SECTION("should return empty vector on no match") {
+        auto input = "bbaa";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->match.empty());
+        REQUIRE(res->remainder == input);
+    }
+}
+
+TEST_CASE("many1 operation", "[multiple][many1]") {
+    auto parser = char_parser::chosen_char('a').many1();
+
+    SECTION("should collect single match.") {
+        auto input = "abc";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->match.size() == 1);
+        REQUIRE(res->match == std::vector<char>{'a'});
+        REQUIRE(res->remainder == "bc");
+    }
+
+    SECTION("should collect all matches.") {
+        auto input = "aaabc";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->match.size() == 3);
+        REQUIRE(res->match == std::vector<char>{'a', 'a', 'a'});
+        REQUIRE(res->remainder == "bc");
+    }
+
+    SECTION("should return error on no match") {
+        auto input = "bbaa";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_error());
+        REQUIRE(res.error() == input);
     }
 }

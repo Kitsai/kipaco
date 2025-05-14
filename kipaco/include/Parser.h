@@ -91,6 +91,54 @@ template <typename T> class Parser {
             return typename Parser<NewT>::ParseResultType{res->remainder, f(res->match)};
         });
     }
+
+    Parser<std::vector<T>> many() {
+        auto method = this->method;
+        return {[method](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
+            std::vector<T> vec{};
+
+            std::string new_input = input;
+
+            while(true) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error())
+                    break;
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
+
+    Parser<std::vector<T>> many1() {
+        auto method = this->method;
+        return {[method](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
+            std::vector<T> vec{};
+
+            auto res = (*method)(input);
+
+            if(res.has_error())
+                return cpp::fail(input);
+
+            vec.push_back(res->match);
+            auto new_input = res->remainder;
+
+            while(true) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error())
+                    break;
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
 };
 
 template <typename T> inline Parser<std::string> operator!(const Parser<T>& p) { return p.negate(); }
