@@ -3,6 +3,7 @@
 #include "basic_parsers/literal.h"
 #include "basic_parsers/pure.h"
 #include "combinators/bind.h"
+#include "combinators/left_right.h"
 #include "combinators/pair.h"
 #include "combinators/pred.h"
 #include "exceptions.h"

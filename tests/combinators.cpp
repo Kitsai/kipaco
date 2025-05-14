@@ -133,7 +133,7 @@ TEST_CASE("Negate Combinator", "[combinators, negate]") {
 
 TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     SECTION("literal + literal succeeds") {
-        auto parser = literal("foo") + literal("bar");
+        auto parser = literal("foo") & literal("bar");
 
         auto result = parser.parse("foobar");
 
@@ -144,7 +144,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("literal + any_char succeeds") {
-        auto parser = literal("a") + char_parser::any_char();
+        auto parser = literal("a") & char_parser::any_char();
 
         auto result = parser.parse("ab");
 
@@ -155,7 +155,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("any_char + literal succeeds") {
-        auto parser = char_parser::any_char() + literal("b");
+        auto parser = char_parser::any_char() & literal("b");
 
         auto result = parser.parse("ab");
 
@@ -166,7 +166,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("Fails if first parser fails") {
-        auto parser = literal("foo") + literal("bar");
+        auto parser = literal("foo") & literal("bar");
 
         auto result = parser.parse("bazbar");
 
@@ -174,7 +174,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("Fails if second parser fails") {
-        auto parser = literal("foo") + literal("bar");
+        auto parser = literal("foo") & literal("bar");
 
         auto result = parser.parse("foobaz");
 
@@ -182,7 +182,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("Operator+ with monostate and char") {
-        auto parser = "a" + char_parser::any_char(); // "a" becomes literal("a")
+        auto parser = "a" & char_parser::any_char(); // "a" becomes literal("a")
 
         auto result = parser.parse("ab");
 
@@ -193,7 +193,7 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
     }
 
     SECTION("Nested pair") {
-        auto parser = char_parser::any_char() + (literal("x") + char_parser::any_char());
+        auto parser = char_parser::any_char() & (literal("x") & char_parser::any_char());
 
         auto result = parser.parse("axy");
 
@@ -207,5 +207,76 @@ TEST_CASE("pair combinator", "[parser][combinator][pair]") {
         REQUIRE(inner.first == std::monostate()); // monostate
         REQUIRE(inner.second == 'y');
         REQUIRE(result->remainder == "");
+    }
+}
+
+TEST_CASE("Left and Right Combinators") {
+    using namespace kipaco::char_parser;
+    SECTION("Left keeps left value, discards right") {
+        auto parser = any_char() << literal("x");
+        auto result = parser.parse("ax");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == 'a');
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Right keeps right value, discards left") {
+        auto parser = literal("a") >> any_char();
+        auto result = parser.parse("ab");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == 'b');
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Left fails if right parser fails") {
+        auto parser = any_char() << literal("x");
+        auto result = parser.parse("ay"); // 'y' ≠ 'x'
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "y");
+    }
+
+    SECTION("Right fails if left parser fails") {
+        auto parser = literal("a") >> any_char();
+        auto result = parser.parse("xb"); // 'x' ≠ 'a'
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "xb");
+    }
+
+    SECTION("Left with string literal on left") {
+        auto parser = std::string("foo") << literal("bar");
+        auto result = parser.parse("foobar");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::monostate{});
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Right with string literal on right") {
+        auto parser = literal("foo") >> std::string("bar");
+        auto result = parser.parse("foobar");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::monostate{});
+        REQUIRE(result->remainder == "");
+    }
+
+    SECTION("Left fails if any part fails") {
+        auto parser = std::string("foo") << literal("bar");
+        auto result = parser.parse("foobaz");
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "baz");
+    }
+
+    SECTION("Right fails if any part fails") {
+        auto parser = std::string("foo") >> literal("bar");
+        auto result = parser.parse("f00bar");
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "f00bar");
     }
 }
