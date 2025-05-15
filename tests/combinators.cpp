@@ -427,3 +427,30 @@ TEST_CASE("Either Combinator") {
         REQUIRE(result->remainder == "ose");
     }
 }
+
+TEST_CASE("many(n) combinator") {
+    auto parser = char_parser::digit().many(2);
+
+    SECTION("Parses at least n digits and continues") {
+        auto result = parser.parse("123abc");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::vector<char>{'1', '2', '3'});
+        REQUIRE(result->remainder == "abc");
+    }
+
+    SECTION("Fails if fewer than n digits") {
+        auto result = parser.parse("9abc");
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "9abc");
+    }
+
+    SECTION("Parses exactly n digits when no more available") {
+        auto result = parser.parse("56x");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::vector<char>{'5', '6'});
+        REQUIRE(result->remainder == "x");
+    }
+}

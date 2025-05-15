@@ -114,6 +114,64 @@ template <typename T> class Parser {
         }};
     }
 
+    Parser<std::vector<T>> many(const size_t n) {
+        auto method = this->method;
+
+        return {[method, n](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
+            std::vector<T> vec{};
+
+            std::string new_input = input;
+
+            for(size_t i = 0; i < n; i++) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error())
+                    return cpp::fail(input);
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            while(true) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error())
+                    break;
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
+
+    Parser<std::vector<T>> many(const size_t min, const size_t max) {
+        auto method = this->method;
+
+        return {[method, min, max](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
+            std::vector<T> vec{};
+
+            std::string new_input = input;
+
+            for(size_t i = 0; i < max; i++) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error()) {
+                    if(i < 0)
+                        return cpp::fail(input);
+                    else
+                        break;
+                }
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
+
     Parser<std::vector<T>> many1() {
         auto method = this->method;
         return {[method](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
@@ -132,6 +190,28 @@ template <typename T> class Parser {
 
                 if(res.has_error())
                     break;
+
+                vec.push_back(res->match);
+                new_input = res->remainder;
+            }
+
+            return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
+
+    Parser<std::vector<T>> n_times(const size_t n) {
+        auto method = this->method;
+
+        return {[method, n](const std::string& input) -> typename Parser<std::vector<T>>::ParseResult {
+            std::vector<T> vec{};
+
+            std::string new_input = input;
+
+            for(size_t i = 0; i < n; i++) {
+                auto res = (*method)(new_input);
+
+                if(res.has_error())
+                    return cpp::fail(input);
 
                 vec.push_back(res->match);
                 new_input = res->remainder;
