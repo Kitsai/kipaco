@@ -366,3 +366,64 @@ TEST_CASE("optional", "[optional]") {
         REQUIRE(!res->match.has_value());
     }
 }
+
+TEST_CASE("Either Combinator") {
+    SECTION("Parses using first parser if it succeeds") {
+        auto parser = literal("yes") | literal("no");
+        auto result = parser.parse("yes please");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::monostate{}); // literal returns monostate
+        REQUIRE(result->remainder == " please");
+    }
+
+    SECTION("Parses using second parser if first fails") {
+        auto parser = literal("yes") | literal("no");
+        auto result = parser.parse("no thanks");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->match == std::monostate{});
+        REQUIRE(result->remainder == " thanks");
+    }
+
+    SECTION("Fails if both parsers fail") {
+        auto parser = literal("yes") | literal("no");
+        auto result = parser.parse("maybe");
+
+        REQUIRE(result.has_error());
+        REQUIRE(result.error() == "maybe");
+    }
+
+    SECTION("String overload left | Parser") {
+        auto parser = std::string("hi") | literal("hello");
+        auto result = parser.parse("hi there");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->remainder == " there");
+    }
+
+    SECTION("Parser | String overload") {
+        auto parser = literal("hello") | std::string("hi");
+        auto result = parser.parse("hi again");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->remainder == " again");
+    }
+
+    SECTION("Combining multiple options") {
+        auto parser = literal("red") | literal("green") | literal("blue");
+        auto result = parser.parse("greenlight");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->remainder == "light");
+    }
+
+    SECTION("First match wins") {
+        // If both could match, only the first is chosen
+        auto parser = literal("go") | literal("gopher");
+        auto result = parser.parse("goose");
+
+        REQUIRE(result.has_value());
+        REQUIRE(result->remainder == "ose");
+    }
+}
