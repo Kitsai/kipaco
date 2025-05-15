@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <variant>
@@ -137,6 +138,18 @@ template <typename T> class Parser {
             }
 
             return typename Parser<std::vector<T>>::ParseResultType{new_input, vec};
+        }};
+    }
+
+    Parser<std::optional<T>> optional() {
+        auto method = this->method;
+        return {[method](const std::string& input) -> typename Parser<std::optional<T>>::ParseResult {
+            auto res = (*method)(input);
+
+            if(res.has_value())
+                return typename Parser<std::optional<T>>::ParseResultType{res->remainder, res->match};
+
+            return typename Parser<std::optional<T>>::ParseResultType{input, {}};
         }};
     }
 };

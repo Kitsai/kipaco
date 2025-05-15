@@ -341,3 +341,28 @@ TEST_CASE("many1 operation", "[multiple][many1]") {
         REQUIRE(res.error() == input);
     }
 }
+
+TEST_CASE("optional", "[optional]") {
+    auto parser = literal("teste").optional();
+
+    SECTION("Should have a value on match") {
+        auto input = "teste1";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->remainder == "1");
+        REQUIRE(res->match.has_value());
+        REQUIRE(res->match.value() == std::monostate());
+    }
+
+    SECTION("Should not have value on fail") {
+        auto input = "Teste1";
+
+        auto res = parser(input);
+
+        REQUIRE(res.has_value());
+        REQUIRE(res->remainder == input);
+        REQUIRE(!res->match.has_value());
+    }
+}
